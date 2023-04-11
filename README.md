@@ -41,7 +41,7 @@ python scripts/liveBotClass.py
 ## How it works 🤓
 
 
-- "trainModelNB.ipynb" exemplifies the workflow used to develop a model. trainModel.py does the same thing but in script format instead of jupyter notebook.
+- "trainModelNB.ipynb" exemplifies the workflow used to develop a model. "trainModel.py" does the same thing but in script format instead of jupyter notebook.
 
 - You can mess around with the functions to make your own.
 
