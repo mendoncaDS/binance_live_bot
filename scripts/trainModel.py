@@ -12,21 +12,37 @@ import botsFactoryLib as botsFactoryLib
 from histDataHandler import loadSuchData
 from sklearn.metrics import mean_squared_error
 
-modelName = "placeHolderModel"
+modelName = "tradingViewEyeBacktestModel"
 
-timePeriods = [2, 5, 30, 2*60, 6*60, 24*60, 4*24*60]
-rollingMeanWindow = 10
-predictionHorizon = 11
+timePeriods = [
+    2,
+    6,
+    12,
+    24,
+    4*24,
+    8*24,
+    14*24,
+    20*24,
+    30*24,
+    45*24,
+    3*30*24,
+    6*30*24,
+    ]
+
+rollingMeanWindow = 24
+predictionHorizon = 30
+frequency="1h"
 
 modelParamsDict = {
     "timePeriods":timePeriods,
     "rollingMeanWindow":rollingMeanWindow,
     "predictionHorizon":predictionHorizon,
+    "frequency":frequency,
 }
 
-initialDate = "2022-01-01"
+initialDate = "2018-01-01"
 
-BTCUSDT_1m = loadSuchData(startDate=initialDate,ticker="BTCUSDT",frequency="1m")
+BTCUSDT_1m = loadSuchData(startDate=initialDate,ticker="BTCUSDT",frequency=frequency)
 
 print("generating target")
 BTCUSDT_1m = botsFactoryLib.genTarget(data=BTCUSDT_1m, rollingMeanWindow=rollingMeanWindow, predictionHorizon=predictionHorizon)
@@ -126,13 +142,13 @@ def train_model(params):
     return error
 
 space = [
-        (.001, .5, 'log-uniform'), #learning rate
+        (.001, .6, 'log-uniform'), #learning rate
         (0.2, 1.0),    # subsample         
         (0.1, 1.0),     # colsample bytree  
-        (5, 10)         # max_depth         
+        (5, 12)         # max_depth         
         ]
 
-results_gp = skopt.gp_minimize(train_model, space, random_state=42, verbose=1, n_calls=40, n_random_starts=10)
+results_gp = skopt.gp_minimize(train_model, space, random_state=42, verbose=1, n_calls=50, n_random_starts=10)
 
 params = results_gp.x
 

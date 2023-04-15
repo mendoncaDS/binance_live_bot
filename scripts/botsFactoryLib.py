@@ -25,12 +25,12 @@ def genDate(data):
     """
     Generate date columns from index.
     """
-    data["year"] = data.index.year
+
     data["month"] = data.index.month
     data["day"] = data.index.day
     data["dayofweek"] = data.index.dayofweek
     data["hour"] = data.index.hour
-    data["minute"] = data.index.minute
+
     return data
 
 def genBollingerBand(data, timeperiods, colname):
@@ -110,7 +110,7 @@ def rescale_load(data,modelName):
     for i in data.columns:
         if (i == "month") | (i == "day") | (i == "dayofweek") | (i == "hour") | (i == "minute"):
             continue
-
+        
         mms = pickle.load(open(f'models/{modelName}/scalers/{i}_scaler.pkl', 'rb'))
         scalers[f"{i}_scaler"] = mms
         data[i] = mms.transform(data[[i]])
@@ -143,11 +143,14 @@ def cyclicalTime(data):
     data['hour_sin'] = data['hour'].apply( lambda x: np.sin( x * ( 2. * np.pi/24 ) ) )
     data['hour_cos'] = data['hour'].apply( lambda x: np.cos( x * ( 2. * np.pi/24 ) ) )
 
-    data['minute_sin'] = data['minute'].apply( lambda x: np.sin( x * ( 2. * np.pi/60 ) ) )
-    data['minute_cos'] = data['minute'].apply( lambda x: np.cos( x * ( 2. * np.pi/60 ) ) )
 
     # drop month, day, dayofweek, hour and minute columns from data
-    data = data.drop(['month','day','dayofweek','hour','minute'], axis=1)
+    data = data.drop([
+        'month',
+        'day',
+        'dayofweek',
+        'hour',
+        ], axis=1)
 
     return data
 

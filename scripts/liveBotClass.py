@@ -91,8 +91,8 @@ class tradingBot:
             print("Data not found, downloading.\n")
             self.marketData = BinanceData.download(
                 self.symbol,
-                start = (dt.datetime.now(pytz.timezone("UTC"))-dt.timedelta(minutes=self.dataLength)).strftime("%Y-%m-%d %H:%M"),
-                interval="1m").get(["Open", "High", "Low", "Close", "Volume"])
+                start = (dt.datetime.now(pytz.timezone("UTC"))-dt.timedelta(hours=self.dataLength)).strftime("%Y-%m-%d %H:%M"),
+                interval=self.modelParamsDict["frequency"]).get(["Open", "High", "Low", "Close", "Volume"])
             self.marketData = pd.concat([self.marketData[:"2023-03-24 11:27:00+00:00"],self.marketData["2023-03-24 14:00:00+00:00":]])
             self.marketData.to_csv(f"{self.botFolderPath}/{self.name}_data.csv")
 
@@ -111,9 +111,11 @@ class tradingBot:
             pd.DataFrame([
                 'Timestamp',
                 'pfVal',
-                'cryptoRatio',
+                'assetRatio',
                 'prediction'
             ]).T.to_csv(f"{self.botFolderPath}/{self.name}_preds.csv",mode="a",header=0,index=False)
+        else:
+            self.preds = pd.read_csv(f"{self.botFolderPath}/{self.name}_preds.csv",index_col=0)["prediction"]
     
     def initializedModelAndScalers(self):
         with open(f"models/{self.modelName}/{self.modelName}.pkl", 'rb') as pickle_file:
@@ -160,19 +162,20 @@ class tradingBot:
                 self.pfValUSD = self.Portfolio["inUSD"].sum()
                 self.pfValNonUSD = (self.Portfolio["inUSD"]/[self.price,self.price]).sum()
 
-                self.cryptoRatio = self.Portfolio["inUSD"][0]/self.Portfolio["inUSD"].sum()
+                self.assetRatio = self.Portfolio["inUSD"][0]/self.Portfolio["inUSD"].sum()
                 break
     
     def refreshSaveData(self):
         
-        if dt.datetime.now(pytz.timezone("UTC")) - dt.datetime.fromtimestamp(self.lastMarketDataTS.value/1000000000,tz=pytz.timezone("UTC")) > dt.timedelta(seconds=121):
+        if dt.datetime.now(pytz.timezone("UTC")) - dt.datetime.fromtimestamp(self.lastMarketDataTS.value/1000000000,tz=pytz.timezone("UTC")) > dt.timedelta(seconds=60*60*2):
             newRow = BinanceData.download(
                 self.symbol,
-                start = self.lastMarketDataTS + dt.timedelta(minutes=1),
-                end = dt.datetime.now(pytz.timezone("UTC")) - dt.timedelta(minutes=1),
-                interval="1m").get(["Open", "High", "Low", "Close", "Volume"])
+                start = self.lastMarketDataTS + dt.timedelta(hours=1),
+                end = dt.datetime.now(pytz.timezone("UTC")) - dt.timedelta(hours=1),
+                interval=self.modelParamsDict["frequency"]).get(["Open", "High", "Low", "Close", "Volume"])
             
             self.marketData = pd.concat([self.marketData,newRow]).iloc[-self.dataLength:,:]
+
             self.lastMarketDataTS = self.marketData.index[-1]
 
             # SAVE
@@ -186,10 +189,11 @@ class tradingBot:
         self.currentPrediction = (descaledModelPred/100)*self.price
     
     def saveFinish(self):
-        self.refreshPortfolio()
-        predDict = {"Timestamp":self.lastMarketDataTS,"pfVal":self.pfValUSD,"cryptoRatio":self.cryptoRatio,"prediction":self.currentPrediction}
-        predDF = pd.DataFrame(predDict,index=[0])
-        predDF.to_csv(f"{self.botFolderPath}/{self.name}_preds.csv",mode="a",index=False,header=False)
+        if dt.datetime.now(pytz.timezone("UTC")) - dt.datetime.fromtimestamp(self.lastMarketDataTS.value/1000000000,tz=pytz.timezone("UTC")) > dt.timedelta(seconds=60*60):
+            self.refreshPortfolio()
+            predDict = {"Timestamp":self.lastMarketDataTS,"pfVal":self.pfValUSD,"assetRatio":self.assetRatio,"prediction":self.currentPrediction}
+            predDF = pd.DataFrame(predDict,index=[0])
+            predDF.to_csv(f"{self.botFolderPath}/{self.name}_preds.csv",mode="a",index=False,header=False)
     #-----
 
 
@@ -223,14 +227,14 @@ class tradingBot:
         
         # utility functions (basically to avoid minimum notional)
         def upThenDown():
-            self.placeOrder(sell=False,amount=(self.pfValNonUSD*(1-self.cryptoRatio)),saveOrder=saveOrder, refreshPf=True)
+            self.placeOrder(sell=False,amount=(self.pfValNonUSD*(1-self.assetRatio)),saveOrder=saveOrder, refreshPf=True)
             self.placeOrder(sell=True,amount=(self.pfValNonUSD*(1-self.targetRatio)),saveOrder=saveOrder)
         def downThenUp():
-            self.placeOrder(sell=True,amount=(self.pfValNonUSD*self.cryptoRatio),saveOrder=saveOrder, refreshPf=True)
+            self.placeOrder(sell=True,amount=(self.pfValNonUSD*self.assetRatio),saveOrder=saveOrder, refreshPf=True)
             self.placeOrder(sell=False,amount=(self.pfValNonUSD*self.targetRatio),saveOrder=saveOrder)
 
         # if the difference between the target ratio and the current ratio is less than minPctChange, do nothing
-        percentChange = self.targetRatio-self.cryptoRatio
+        percentChange = self.targetRatio-self.assetRatio
         if abs(percentChange)>self.minPctChange:
             
             minNotionalThreshold = 12
@@ -238,7 +242,7 @@ class tradingBot:
             
             # avoid minimum notional
             if abs(percentChange)<minNotionalRatio:
-                if (self.cryptoRatio>1.2*minNotionalRatio):
+                if (self.assetRatio>1.2*minNotionalRatio):
                     downThenUp()
                 else:
                     upThenDown()
@@ -270,7 +274,7 @@ class tradingBot:
                 
                 # SELL
                 if sell:
-                    amountCrypto = self.pfValNonUSD*self.cryptoRatio
+                    amountCrypto = self.pfValNonUSD*self.assetRatio
                     if amount > amountCrypto:
                         print("Not enough crypto to sell!")
                         amount = amountCrypto*0.9999
@@ -279,7 +283,7 @@ class tradingBot:
                 
                 # BUY
                 else:
-                    amountUSD = self.pfValNonUSD*(1-self.cryptoRatio)
+                    amountUSD = self.pfValNonUSD*(1-self.assetRatio)
                     if amount > amountUSD:
                         print("Not enough USD to buy!")
                         amount = amountUSD*0.9999
@@ -321,7 +325,7 @@ class tradingBot:
                 self.refreshAll()
 
                 now = dt.datetime.now(pytz.timezone("UTC"))
-                timeGap = now.minute-self.lastMarketDataTS.minute
+                timeGap = now.hour-self.lastMarketDataTS.hour
 
                 if timeGap <= 1:
 
@@ -330,18 +334,18 @@ class tradingBot:
 
                     break
 
-                print(f"DATA IS LATE: now-{now.minute} vs last-{self.lastMarketDataTS.minute+1} -> timeGap = {timeGap}\n")
+                print(f"DATA IS LATE: now-{now.hour} vs last-{self.lastMarketDataTS.hour+1} -> timeGap = {timeGap}\n")
                 print("Sleeping 1 second")
 
                 await asyncio.sleep(1)
         
             now = dt.datetime.now(pytz.timezone("UTC"))
-            timeToWait = round(61-(now.second+(now.microsecond)/1000000),4)
+            timeToWait = round(61-(now.minute),4)
 
-            print(f"Seconds now: {now.second}")
-            print(f"Waiting {timeToWait} seconds")
+            print(f"Minute now: {now.minute}")
+            print(f"Waiting {timeToWait} minutes")
 
-            await asyncio.sleep(timeToWait) 
+            await asyncio.sleep(timeToWait*60) 
     #-----
 
 
@@ -359,8 +363,8 @@ async def main():
     smartBot1 = tradingBot(
         modelName=modelName,
         symbol="BTCUSDT",
-        minPctChange=2/100,
-        exposureMultiplier=100,
+        minPctChange=5/100,
+        exposureMultiplier=10,
         API = [api_key_testnet, api_secret_testnet],
         )
 

@@ -2,6 +2,12 @@
 # Bots Factory 🤖
 A trading bot class that connects to Binance and tries to make money by predicting a moving average.
 
+You can read about this bot in my medium:
+
+- [Trading Bot in Python](https://medium.com/@mendoncaDS/trading-bot-in-python-99ce77077372)
+
+- [Trading Bot UI in Python](https://medium.com/@mendoncaDS/trading-bot-ui-in-python-571f6710ac5e)
+
 ## Get Started 🚀  
 
 - Clone the repository:
@@ -28,7 +34,7 @@ modelName = placeHolderModel
 conda activate liveBot
 ~~~
 
-- Generate the model, scalers and parameters by running "trainModel.py"
+- Generate the model, scalers and parameters by running "trainModel.py" (Note that it uses GPU by default and will probably throw an error if not available. Without GPU it takes too long.)
 ~~~
 python scripts/trainModel.py
 ~~~
