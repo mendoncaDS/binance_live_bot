@@ -1,5 +1,5 @@
 
-print("Importing libraries...")
+print("Importing libraries")
 import json
 import skopt
 import pickle
@@ -7,21 +7,24 @@ import pickle
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+import vectorbt as vbt
 import botsFactoryLib as botsFactoryLib
 
-from histDataHandler import loadSuchData
 from sklearn.metrics import mean_squared_error
 
-modelName = "tradingViewEyeBacktestModel"
+rollingMeanWindow = 7*24
+predictionHorizon = rollingMeanWindow+1
+
+modelName = f"articleModelSMA{rollingMeanWindow}"
 
 timePeriods = [
-    2,
-    6,
-    12,
-    24,
-    4*24,
-    8*24,
-    14*24,
+    3,
+    5,
+    10,
+    25,
+    3*24,
+    7*24,
+    15*24,
     20*24,
     30*24,
     45*24,
@@ -29,8 +32,6 @@ timePeriods = [
     6*30*24,
     ]
 
-rollingMeanWindow = 24
-predictionHorizon = 30
 frequency="1h"
 
 modelParamsDict = {
@@ -40,24 +41,34 @@ modelParamsDict = {
     "frequency":frequency,
 }
 
-initialDate = "2018-01-01"
+initialDate = "2017-01-01"
 
-BTCUSDT_1m = loadSuchData(startDate=initialDate,ticker="BTCUSDT",frequency=frequency)
+print("downloading data")
+
+data = pd.read_csv("backtesting_ohlcv_data.csv",index_col=0,parse_dates=True)
+
+#data = vbt.BinanceData.download(
+    #"BTCUSDT",
+    #start = initialDate,
+    #interval = frequency).get(["Open", "High", "Low", "Close", "Volume"])
 
 print("generating target")
-BTCUSDT_1m = botsFactoryLib.genTarget(data=BTCUSDT_1m, rollingMeanWindow=rollingMeanWindow, predictionHorizon=predictionHorizon)
+data = botsFactoryLib.genTarget(data=data, rollingMeanWindow=rollingMeanWindow, predictionHorizon=predictionHorizon)
 
 print("generating date features")
-BTCUSDT_1m = botsFactoryLib.genDate(BTCUSDT_1m)
+data = botsFactoryLib.genDate(data)
+
+print("processing open, high, low")
+data = botsFactoryLib.processOHL(data)
 
 print("generating technical indicators")
-BTCUSDT_1m = botsFactoryLib.genTechnicalIndicators(BTCUSDT_1m,timePeriods)
+data = botsFactoryLib.genTechnicalIndicators(data,timePeriods)
 
 print("rescaling")
-BTCUSDT_1m = botsFactoryLib.rescale_gen(BTCUSDT_1m,modelName,save=True)
+data = botsFactoryLib.rescale_gen(data,modelName,save=True)
 
 print("generating cyclical features")
-BTCUSDT_1m = botsFactoryLib.cyclicalTime(BTCUSDT_1m)
+data = botsFactoryLib.cyclicalTime(data)
 
 
 
@@ -104,10 +115,11 @@ def splitDataRandom(
 
     return Train, Val, Test
 
-x_all = BTCUSDT_1m.drop(["Target"],axis=1)
-y_all = BTCUSDT_1m["Target"]
+print("splitting data")
+x_all = data.drop(["Target"],axis=1)
+y_all = data["Target"]
 
-Train, Val, Test = splitDataRandom(TrainSize=0.84,ValSize=0.08,TestSize=0.08,data=BTCUSDT_1m)
+Train, Val, Test = splitDataRandom(TrainSize=0.84,ValSize=0.08,TestSize=0.08,data=data)
 
 x_train = Train.drop(["Target"],axis=1)
 y_train = Train["Target"]
@@ -145,10 +157,11 @@ space = [
         (.001, .6, 'log-uniform'), #learning rate
         (0.2, 1.0),    # subsample         
         (0.1, 1.0),     # colsample bytree  
-        (5, 12)         # max_depth         
+        (5, 11)         # max_depth         
         ]
 
-results_gp = skopt.gp_minimize(train_model, space, random_state=42, verbose=1, n_calls=50, n_random_starts=10)
+print("optimizing hyperparameters")
+results_gp = skopt.gp_minimize(train_model, space, random_state=42, verbose=1, n_calls=100, n_random_starts=20)
 
 params = results_gp.x
 
@@ -157,6 +170,8 @@ subsample = params[1]
 colsample_bytree = params[2]
 max_depth = params[3]
 
+
+print("training model")
 model_xgb_bayes = xgb.XGBRegressor(
         eta=learning_rate,
         subsample=subsample,
@@ -174,5 +189,7 @@ def saveModel(model, modelName, modelParamsDict):
         json.dump( modelParamsDict, file )
 
 selectedModel = model_xgb_bayes.fit(x_all, y_all)
+print("saving model")
 saveModel(selectedModel, modelName, modelParamsDict)
+print("model saved")
 

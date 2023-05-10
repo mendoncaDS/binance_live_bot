@@ -8,6 +8,8 @@ You can read about this bot in my medium:
 
 - [Trading Bot UI in Python](https://medium.com/@mendoncaDS/trading-bot-ui-in-python-571f6710ac5e)
 
+- [Trading Bot Model Selection in Python](https://medium.com/@mendoncaDS/trading-bot-model-selection-in-python-7f01f3769f56)
+
 ## Get Started 🚀  
 
 - Clone the repository:
@@ -41,18 +43,24 @@ python scripts/trainModel.py
 
 - Run the bot
 ~~~
-python scripts/liveBotClass.py
+run.bat
 ~~~
 
 ## How it works 🤓
 
 
-- "trainModelNB.ipynb" exemplifies the workflow used to develop a model. "trainModel.py" does the same thing but in script format instead of jupyter notebook.
+- **trainModelNB.ipynb** exemplifies the workflow used to develop a model. **trainModel.py** does the same thing but in script format instead of jupyter notebook.
 
 - You can mess around with the functions to make your own.
 
-- Once you are done, make sure the functions in the Jupyter Notebook are available in "botsFactoryLib.py".
+- Once you are done, make sure the functions in the Jupyter Notebook are available in **botsFactoryLib.py**.
 
 - The bot class will use these functions to run the model live, so they should match the custom model you have developed.
 
-- It is recommended that you reserve one repository for every new model.
+- Run **modelsBacktest.py** to perform grid search on exposure parameters for live trading. These parameters are set when instantiating a tradingBot class (defined in **liveBotClass.py**)
+
+- These scripts were developed for my medium articles so you probably'll want to tweak the code
+
+- Finally, **trainModelNB.ipynb** is a kind of playground to backtest your models
+
+- Have fun, cheers! 🥳

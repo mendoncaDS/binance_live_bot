@@ -236,7 +236,7 @@ def mainLayout(log, histData, preds):
                     st.markdown(f"**Number of trades:**<br/>{math.floor((len(logTrim))/2)}",unsafe_allow_html=True)
                 
                 st.markdown(f"**Current prediction ABS:**<br/>{round(prediction,2)} USD",unsafe_allow_html=True)
-                st.markdown(f"**Current prediction %:**<br/>{round(((prediction-histData['Close'][-1])/histData['Close'][-1])*100,2)}%",unsafe_allow_html=True)
+                st.markdown(f"**Current prediction %:**<br/>{round(((prediction-predictionMAPlot[-1])/predictionMAPlot[-1])*100,2)}%",unsafe_allow_html=True)
 
             with col12:
                 st.markdown(f"**Portfolio Initial value:**<br/>{round(pfValueInitial,2)} USD",unsafe_allow_html=True)

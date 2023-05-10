@@ -26,6 +26,7 @@ class tradingBot:
         symbol,
         minPctChange,
         exposureMultiplier,
+        exposureConstant,
         API,
         ):
 
@@ -34,6 +35,7 @@ class tradingBot:
         self.symbol = symbol
         self.minPctChange = minPctChange
         self.exposureMultiplier = exposureMultiplier
+        self.exposureConstant = exposureConstant
         self.API = API
         self.modelName = modelName
 
@@ -205,7 +207,7 @@ class tradingBot:
         predictedMA = talib.MA(self.marketData["Close"],timeperiod=self.modelParamsDict["rollingMeanWindow"]).iloc[-1]
 
         # if price is above current and predicted MA, this means the price is going down. thus, sell all
-        if (self.price > predictedMA) & (self.price > self.currentPrediction):
+        if (self.price > self.currentPrediction):
             self.targetRatio = 0
 
         # else, compute predicted percentual change of the MA and use it to generate the target ratio of exposure
@@ -214,7 +216,7 @@ class tradingBot:
 
             # the operation below is mostly arbitrary and can be optimized through backtests
             # it converts the predicted percentual change of the MA into a target ratio of exposure
-            self.targetRatio = min(max(percentualPred*self.exposureMultiplier,0),1)
+            self.targetRatio = min(max(percentualPred*self.exposureMultiplier+self.exposureConstant,0),1)
         
         # if the target ratio is below minPctChange, set it to 0
         if self.targetRatio < self.minPctChange:
@@ -340,7 +342,7 @@ class tradingBot:
                 await asyncio.sleep(1)
         
             now = dt.datetime.now(pytz.timezone("UTC"))
-            timeToWait = round(61-(now.minute),4)
+            timeToWait = round(60-(now.minute),4)
 
             print(f"Minute now: {now.minute}")
             print(f"Waiting {timeToWait} minutes")
@@ -363,8 +365,9 @@ async def main():
     smartBot1 = tradingBot(
         modelName=modelName,
         symbol="BTCUSDT",
-        minPctChange=5/100,
+        minPctChange=1/100,
         exposureMultiplier=10,
+        exposureConstant=2.5,
         API = [api_key_testnet, api_secret_testnet],
         )
 
